@@ -11,9 +11,6 @@ Pantalla LCD
 #include <MechaQMC5883.h>
 #include <QMC5883LCompass.h>
 
-QMC5883LCompass compass;
-
-
 //0:verde 1:rojo 2:azul 3: morado 4:amarillo 5:blanco 6:negro 7:rosa
 String ordenColores[4] = {"R", "G", "B", "SC"};
 String coloresLista[8] = {"verde", "rojo", "azul", "morado", "amarillo", "blanco", "negro", "rosa"};
@@ -385,23 +382,26 @@ public:
     }
 };
 
-MechaQMC5883 brujula;
+QMC5883LCompass compass;
 class Brujula
 {
 public:
-    uint16_t x, y, z;
     float angulo;
     float up = 0;
     float down = 0;
     float left = 0;
     float right = 0;
     float front = 0;
+    void setup()
+    {
+        compass.init();
+        compass.setCalibration(-682, 440, -1028, 152, -568, 0);
+    }
     void Calibrar()
     {
-        brujula.init();
         for (int i = 0; i != 10; i++)
         {
-            brujula.read(&x, &y, &z, &angulo);
+            angulo = compass.getAzimuth();
             up = up + angulo;
             delay(50);
         }
@@ -413,7 +413,7 @@ public:
     }
     void Lectura()
     {
-        brujula.read(&x, &y, &z, &angulo);
+        angulo = compass.getAzimuth();
     }
 };
 
@@ -425,7 +425,7 @@ PuenteH puenteH;
 SensorUtrasonido sensorUtrasonidoEnfrente(37, 36);
 SensorUtrasonido sensorUtrasonidoIzquierda(7, 13);
 SensorUtrasonido sensorUtrasonidoDerecha(38, 39);
-//Brujula compass;
+Brujula brujula;
 PantallaLCD pantallaLCD;
 //Ejecutación del robot
 
@@ -434,15 +434,14 @@ void setup()
 {
     Serial.begin(9600);
     //Wire.begin();
-    //sensorColorDerecha.setup();
-    //sensorColorIzquierda.setup();
-    //puenteH.setup();
-    //sensorUtrasonidoEnfrente.setup();
-    //sensorUtrasonidoIzquierda.setup();
-    //sensorUtrasonidoDerecha.setup();
+    sensorColorDerecha.setup();
+    sensorColorIzquierda.setup();
+    puenteH.setup();
+    sensorUtrasonidoEnfrente.setup();
+    sensorUtrasonidoIzquierda.setup();
+    sensorUtrasonidoDerecha.setup();
     pantallaLCD.setup();
-    compass.init();
-    compass.setCalibration(-682, 440, -1028, 152, -568, 0);
+    brujula.setup();
     /*
     sensorColorDerecha.Calibracion(pantallaLCD);
     sensorColorIzquierda.Calibracion(pantallaLCD);
@@ -464,23 +463,24 @@ void setup()
     */
 }
 int cont = 0;
+void AvanzarHastaPared()
+{
+    while (sensorUtrasonidoEnfrente.distancia > 5)
+    {
+        puenteH.Avanzar(150);
+    }
+    puenteH.Detener();
+}
+void GirarDerecha()
+{
+    while (brujula.angulo < brujula.right)
+    {
+        puenteH.Derecha();
+    }
+    puenteH.Detener();
+}
 void loop()
 {
-    int a;
-    
-    // Read compass values
-    compass.read();
-  
-    // Return Azimuth reading
-    a = compass.getAzimuth();
-    
-    Serial.print("A: ");
-    Serial.print(a);
-    Serial.println();
-    
-    delay(250); 
-    Serial.println(a);
-    pantallaLCD.limpiar();
-    pantallaLCD.imprimirAbajo(String(a));
-    //pantallaLCD.imprimirArriba("Te amo Yair");
+    AvanzarHastaPared();
+    GirarDerecha();
 }
