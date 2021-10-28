@@ -481,6 +481,10 @@ void GirarDerecha()
 }
 void loop()
 {
-    AvanzarHastaPared();
-    GirarDerecha();
+    while (cont < 3)
+    {
+        AvanzarHastaPared();
+        GirarDerecha();
+        cont++;
+    }
 }
