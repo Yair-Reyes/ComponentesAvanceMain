@@ -446,35 +446,44 @@ void setup()
     brujula.setup();
 }
 int cont = 0;
-void AvanzarCorregido(int velocidad, float angFrente)
+void CorregirAngulo(float front)
+{
+    brujula.Lectura();
+    if (brujula.angulo < front)
+    {
+        while (brujula.angulo < front)
+        {
+            puenteH.Derecha(50);
+            brujula.Lectura();
+        }
+    }
+    else if (brujula.angulo > front)
+    {
+        while (brujula.angulo > front)
+        {
+            puenteH.Izquierda(50);
+            brujula.Lectura();
+        }
+    }
+    puenteH.Detener();
+}
+void AvanzarCorregido(int velocidad, float front)
 {
     puenteH.Avanzar(velocidad);
     delay(100);
-    puenteH.Detener();
-    brujula.Lectura();
-    if (brujula.angulo < angFrente)
-    {
-        puenteH.Izquierda(velocidad);
-        delay(100);
-        puenteH.Detener();
-    }
-    else if (brujula.angulo > angFrente)
-    {
-        puenteH.Derecha(velocidad);
-        delay(100);
-        puenteH.Detener();
-    }
+    CorregirAngulo(front);
 }
 void AvanzarHastaPared()
 {
     Serial.println("AvanzarHastaPared");
     sensorUtrasonidoEnfrente.Lectura();
     Serial.println(sensorUtrasonidoEnfrente.distancia);
+    float frenteMomentaneo = brujula.angulo;
     while (sensorUtrasonidoEnfrente.distancia > 5)
     {
         sensorUtrasonidoEnfrente.Lectura();
         brujula.Lectura();
-        puenteH.AvanzarCorregido(150, brujula.angulo);
+        puenteH.AvanzarCorregido(150, frenteMomentaneo);
     }
     puenteH.Detener();
 }
