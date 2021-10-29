@@ -8,7 +8,6 @@ Pantalla LCD
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 #include <LCD.h>
-#include <MechaQMC5883.h>
 #include <QMC5883LCompass.h>
 
 //0:verde 1:rojo 2:azul 3: morado 4:amarillo 5:blanco 6:negro 7:rosa
@@ -300,8 +299,8 @@ public:
     {
         digitalWrite(motorD[0], HIGH);
         digitalWrite(motorD[1], LOW);
-        digitalWrite(motorI[0], LOW);
-        digitalWrite(motorI[1], HIGH);
+        digitalWrite(motorI[0], HIGH);
+        digitalWrite(motorI[1], LOW);
         analogWrite(VelocidadesD, velocidad);
         analogWrite(VelocidadesI, velocidad);
     }
@@ -309,8 +308,8 @@ public:
     {
         digitalWrite(motorD[0], LOW);
         digitalWrite(motorD[1], HIGH);
-        digitalWrite(motorI[0], HIGH);
-        digitalWrite(motorI[1], LOW);
+        digitalWrite(motorI[0], LOW);
+        digitalWrite(motorI[1], HIGH);
         analogWrite(VelocidadesD, velocidad);
         analogWrite(VelocidadesI, velocidad);
     }
@@ -323,23 +322,23 @@ public:
         analogWrite(VelocidadesD, 0);
         analogWrite(VelocidadesI, 0);
     }
-    void Derecha()
-    {
-        digitalWrite(motorD[0], HIGH);
-        digitalWrite(motorD[1], LOW);
-        digitalWrite(motorI[0], LOW);
-        digitalWrite(motorI[1], HIGH);
-        analogWrite(VelocidadesD, 255);
-        analogWrite(VelocidadesI, 255);
-    }
-    void Izquierda()
+    void Derecha(int velocidad)
     {
         digitalWrite(motorD[0], LOW);
         digitalWrite(motorD[1], HIGH);
         digitalWrite(motorI[0], HIGH);
         digitalWrite(motorI[1], LOW);
-        analogWrite(VelocidadesD, 255);
-        analogWrite(VelocidadesI, 255);
+        analogWrite(VelocidadesD, velocidad);
+        analogWrite(VelocidadesI, velocidad);
+    }
+    void Izquierda(int velocidad)
+    {
+        digitalWrite(motorD[0], HIGH);
+        digitalWrite(motorD[1], LOW);
+        digitalWrite(motorI[0], LOW);
+        digitalWrite(motorI[1], HIGH);
+        analogWrite(VelocidadesD, velocidad);
+        analogWrite(VelocidadesI, velocidad);
     }
 };
 //Clase para nuestro sensor de distancia
@@ -396,12 +395,15 @@ public:
     {
         compass.init();
         compass.setCalibration(-682, 440, -1028, 152, -568, 0);
+        Calibrar();
     }
     void Calibrar()
     {
         for (int i = 0; i != 10; i++)
         {
+            compass.read();
             angulo = compass.getAzimuth();
+            Serial.println(angulo);
             up = up + angulo;
             delay(50);
         }
@@ -413,6 +415,7 @@ public:
     }
     void Lectura()
     {
+        compass.read();
         angulo = compass.getAzimuth();
     }
 };
@@ -423,17 +426,16 @@ SensorColor sensorColorDerecha(0, 1, 2, 3, 4);
 SensorColor sensorColorIzquierda(30, 31, 44, 45, 46);
 PuenteH puenteH;
 SensorUtrasonido sensorUtrasonidoEnfrente(37, 36);
-SensorUtrasonido sensorUtrasonidoIzquierda(7, 13);
+SensorUtrasonido sensorUtrasonidoIzquierda(7, 8);
 SensorUtrasonido sensorUtrasonidoDerecha(38, 39);
 Brujula brujula;
 PantallaLCD pantallaLCD;
 //Ejecutación del robot
 
-//Inicialización de componentes
+//Funciones Globales
 void setup()
 {
     Serial.begin(9600);
-    //Wire.begin();
     sensorColorDerecha.setup();
     sensorColorIzquierda.setup();
     puenteH.setup();
@@ -442,49 +444,69 @@ void setup()
     sensorUtrasonidoDerecha.setup();
     pantallaLCD.setup();
     brujula.setup();
-    /*
-    sensorColorDerecha.Calibracion(pantallaLCD);
-    sensorColorIzquierda.Calibracion(pantallaLCD);
-
-    //imprimir los valores nuevos de rangosColores
-    for (int i = 0; i < 8; i++)
-    {
-        Serial.print(coloresLista[i] + " ");
-        for (int j = 0; j < 4; j++)
-        {
-            Serial.print(ordenColores[j] + ": ");
-            for (int k = 0; k < 2; k++)
-            {
-                Serial.print(String(rangosColores[i][j][k]) + " ");
-            }
-            Serial.println();
-        }
-    }
-    */
 }
 int cont = 0;
+void AvanzarCorregido(int velocidad, float angFrente)
+{
+    puenteH.Avanzar(velocidad);
+    delay(100);
+    puenteH.Detener();
+    brujula.Lectura();
+    if (brujula.angulo < angFrente)
+    {
+        puenteH.Izquierda(velocidad);
+        delay(100);
+        puenteH.Detener();
+    }
+    else if (brujula.angulo > angFrente)
+    {
+        puenteH.Derecha(velocidad);
+        delay(100);
+        puenteH.Detener();
+    }
+}
 void AvanzarHastaPared()
 {
+    Serial.println("AvanzarHastaPared");
+    sensorUtrasonidoEnfrente.Lectura();
+    Serial.println(sensorUtrasonidoEnfrente.distancia);
     while (sensorUtrasonidoEnfrente.distancia > 5)
     {
-        puenteH.Avanzar(150);
+        sensorUtrasonidoEnfrente.Lectura();
+        brujula.Lectura();
+        puenteH.AvanzarCorregido(150, brujula.angulo);
     }
     puenteH.Detener();
 }
 void GirarDerecha()
 {
-    while (brujula.angulo < brujula.right)
+    Serial.println("GirarDerecha");
+    brujula.Lectura();
+    Serial.println(brujula.angulo);
+    Serial.println("AAAA" + String(brujula.right));
+    while (brujula.angulo <= brujula.right)
     {
-        puenteH.Derecha();
+        brujula.Lectura();
+        Serial.println("A" + String(brujula.angulo));
+        puenteH.Derecha(50);
     }
     puenteH.Detener();
 }
 void loop()
 {
-    while (cont < 3)
+
+    while (cont < 1)
     {
+
         AvanzarHastaPared();
+        brujula.Lectura();
+        pantallaLCD.imprimirArriba(String(brujula.angulo));
+        pantallaLCD.imprimirAbajo("YairGod");
+        Serial.println("A" + String(brujula.angulo));
+
         GirarDerecha();
         cont++;
     }
+
+    // puenteH.Avanzar(150);
 }
